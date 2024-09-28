@@ -1,4 +1,13 @@
 // this code handles the push button and reflects the button press on a 7 segment light
+#include <MIDI.h>
+#include <hidboot.h>
+#include "IRremote.h"
+
+MIDI_CREATE_DEFAULT_INSTANCE();
+
+int rhythmSnapshot = 3;
+int leadSnapshot = 1;
+int leadSnapshot2 = 2;
 
 // MACROS for use in the 7 segment light
 #define A 2
@@ -16,8 +25,13 @@
 int currentState = 0;
 int previousState = 0;
 
+// constants for IR receiver
+int receiver = A0;
+
 void setup() {
   // put your setup code here, to run once:
+  MIDI.begin(MIDI_CHANNEL_OMNI); // listen to all MIDI channels
+
   pinMode(A, OUTPUT);
   pinMode(B, OUTPUT);
   pinMode(C, OUTPUT);
@@ -62,12 +76,15 @@ void loop() {
   switch(currentState) {
     case 0:
       draw0();
+      changeSnapshot(leadSnapshot);
       break;
     case 1:
       draw1();
+      changeSnapshot(leadSnapshot2);
       break;
     case 2:
       draw2();
+      changeSnapshot(rhythmSnapshot);
       break;
     default:
       draw8();
@@ -175,4 +192,9 @@ void draw9() {
   digitalWrite(E, LOW);
   digitalWrite(F, HIGH);
   digitalWrite(G, HIGH);
+}
+
+void changeSnapshot(int snapshotNumber) {
+  // Send Control Change (CC#69) on Channel 1 to change snapshots
+  MIDI.sendControlChange(69, snapshotNumber, 1);  // CC#69, value = snapshotNumber, channel = 1
 }
