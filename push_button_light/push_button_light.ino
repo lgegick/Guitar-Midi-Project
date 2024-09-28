@@ -54,7 +54,6 @@ void loop() {
   int decodedNumber = 8;
   if (irrecv.decode()) {
     decodedNumber = translateIR();
-    Serial.println(decodedNumber);
   }
 
   // read the state of the button
