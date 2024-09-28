@@ -1,9 +1,9 @@
 // this code handles the push button and reflects the button press on a 7 segment light
-#include <MIDI.h>
-#include <hidboot.h>
+// #include <MIDI.h>
+// #include <hidboot.h>
 #include "IRremote.h"
 
-MIDI_CREATE_DEFAULT_INSTANCE();
+// MIDI_CREATE_DEFAULT_INSTANCE();
 
 int rhythmSnapshot = 3;
 int leadSnapshot = 1;
@@ -25,12 +25,14 @@ int leadSnapshot2 = 2;
 int currentState = 0;
 int previousState = 0;
 
-// constants for IR receiver
+// IR receiver variables
 int receiver = A0;
+IRrecv irrecv(receiver);
+uint32_t last_decodedRawData = 0;
 
 void setup() {
   // put your setup code here, to run once:
-  MIDI.begin(MIDI_CHANNEL_OMNI); // listen to all MIDI channels
+  // MIDI.begin(MIDI_CHANNEL_OMNI); // listen to all MIDI channels
 
   pinMode(A, OUTPUT);
   pinMode(B, OUTPUT);
@@ -45,28 +47,34 @@ void setup() {
   pinMode(button2, INPUT);
   pinMode(button3, INPUT);
   Serial.begin(9600); // initialize the serial communication
+  irrecv.enableIRIn();
 }
 
 void loop() {
+  int decodedNumber = 8;
+  if (irrecv.decode()) {
+    decodedNumber = translateIR();
+    Serial.println(decodedNumber);
+  }
 
   // read the state of the button
   int buttonState1 = digitalRead(button1);
   int buttonState2 = digitalRead(button2);
   int buttonState3 = digitalRead(button3);
 
-  if (buttonState1 == HIGH) {
+  if (buttonState1 == HIGH || decodedNumber == 0) {
     // set light to 0
     currentState = 0;
     Serial.println(currentState);
     delay(200);
   }
-  else if (buttonState2 == HIGH) {
+  else if (buttonState2 == HIGH || decodedNumber == 1) {
     // set light to 1
     currentState = 1;
     Serial.println(currentState);
     delay(200);
   }
-  else if (buttonState3 == HIGH) {
+  else if (buttonState3 == HIGH || decodedNumber == 2) {
     // set the light to 2
     currentState = 2;
     Serial.println(currentState);
@@ -76,21 +84,21 @@ void loop() {
   switch(currentState) {
     case 0:
       draw0();
-      changeSnapshot(leadSnapshot);
+      // changeSnapshot(leadSnapshot);
       break;
     case 1:
       draw1();
-      changeSnapshot(leadSnapshot2);
+      // changeSnapshot(leadSnapshot2);
       break;
     case 2:
       draw2();
-      changeSnapshot(rhythmSnapshot);
+      // changeSnapshot(rhythmSnapshot);
       break;
     default:
       draw8();
       break;
   }
-
+  irrecv.resume();
   delay(50);
 }
 
@@ -194,7 +202,35 @@ void draw9() {
   digitalWrite(G, HIGH);
 }
 
+int translateIR() {
+  // Check if it is a repeat IR code 
+  if (irrecv.decodedIRData.flags)
+  {
+    //set the current decodedRawData to the last decodedRawData 
+    irrecv.decodedIRData.decodedRawData = last_decodedRawData;
+    return last_decodedRawData;
+  } 
+  int decodedData = 8;
+
+  //map the IR code to the remote key
+  switch (irrecv.decodedIRData.decodedRawData)
+  {
+    case 0xE916FF00: decodedData = 0;    break;
+    case 0xF30CFF00: decodedData = 1;    break;
+    case 0xE718FF00: decodedData = 2;    break;
+    default:
+      decodedData = 8;
+  }
+
+  //store the last decodedRawData
+  last_decodedRawData = decodedData;
+  return decodedData;
+  delay(500); // Do not get immediate repeat
+}
+
+/*
 void changeSnapshot(int snapshotNumber) {
   // Send Control Change (CC#69) on Channel 1 to change snapshots
   MIDI.sendControlChange(69, snapshotNumber, 1);  // CC#69, value = snapshotNumber, channel = 1
 }
+*/
