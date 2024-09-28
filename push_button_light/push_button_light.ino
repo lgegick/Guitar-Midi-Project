@@ -1,6 +1,6 @@
 // this code handles the push button and reflects the button press on a 7 segment light
 // #include <MIDI.h>
-// #include <hidboot.h>
+#include <hidboot.h>
 #include "IRremote.h"
 
 // MIDI_CREATE_DEFAULT_INSTANCE();
@@ -30,6 +30,11 @@ int receiver = A0;
 IRrecv irrecv(receiver);
 uint32_t last_decodedRawData = 0;
 
+// values for the different LED's
+#define redLed A5
+#define yellowLed A4
+#define greenLed A3
+
 void setup() {
   // put your setup code here, to run once:
   // MIDI.begin(MIDI_CHANNEL_OMNI); // listen to all MIDI channels
@@ -41,6 +46,9 @@ void setup() {
   pinMode(E, OUTPUT);
   pinMode(F, OUTPUT);
   pinMode(G, OUTPUT);
+  pinMode(redLed, OUTPUT);
+  pinMode(yellowLed, OUTPUT);
+  pinMode(greenLed, OUTPUT);
 
   // setup the button reading
   pinMode(button1, INPUT);
@@ -48,6 +56,7 @@ void setup() {
   pinMode(button3, INPUT);
   Serial.begin(9600); // initialize the serial communication
   irrecv.enableIRIn();
+  draw7();
 }
 
 void loop() {
@@ -65,18 +74,21 @@ void loop() {
     // set light to 0
     currentState = 0;
     Serial.println(currentState);
+    displayRedLed();
     delay(200);
   }
   else if (buttonState2 == HIGH || decodedNumber == 1) {
     // set light to 1
     currentState = 1;
     Serial.println(currentState);
+    displayYellowLed();
     delay(200);
   }
   else if (buttonState3 == HIGH || decodedNumber == 2) {
     // set the light to 2
     currentState = 2;
     Serial.println(currentState);
+    displayGreenLed();
     delay(200);
   }
 
@@ -99,6 +111,24 @@ void loop() {
   }
   irrecv.resume();
   delay(50);
+}
+
+void displayRedLed() {
+  digitalWrite(redLed, HIGH);
+  digitalWrite(greenLed, LOW);
+  digitalWrite(yellowLed, LOW);
+}
+
+void displayGreenLed() {
+  digitalWrite(redLed, LOW);
+  digitalWrite(greenLed, HIGH);
+  digitalWrite(yellowLed, LOW);
+}
+
+void displayYellowLed() {
+  digitalWrite(redLed, LOW);
+  digitalWrite(greenLed, LOW);
+  digitalWrite(yellowLed, HIGH);
 }
 
 void draw0() {
