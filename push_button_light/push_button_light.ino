@@ -1,9 +1,10 @@
 // this code handles the push button and reflects the button press on a 7 segment light
-// #include <MIDI.h>
-#include <hidboot.h>
-#include "IRremote.h"
 
-// MIDI_CREATE_DEFAULT_INSTANCE();
+#include <hidboot.h>
+#include <usbh_midi.h>
+#include <usbhub.h>
+#include <SPI.h>
+#include "IRremote.h"
 
 int rhythmSnapshot = 3;
 int leadSnapshot = 1;
@@ -35,10 +36,11 @@ uint32_t last_decodedRawData = 0;
 #define yellowLed A4
 #define greenLed A3
 
-void setup() {
-  // put your setup code here, to run once:
-  // MIDI.begin(MIDI_CHANNEL_OMNI); // listen to all MIDI channels
+// Create the objects for handling USB output
+USB Usb;
+USBH_MIDI Midi(&Usb);
 
+void setup() {
   pinMode(A, OUTPUT);
   pinMode(B, OUTPUT);
   pinMode(C, OUTPUT);
@@ -56,10 +58,20 @@ void setup() {
   pinMode(button3, INPUT);
   Serial.begin(9600); // initialize the serial communication
   irrecv.enableIRIn();
-  draw7();
+  draw8();
+
+  // Setup the USB MIDI communication
+  if (Usb.Init() == -1) {
+    Serial.println("USB Host Shield initialization failed.");
+    while (1);  // Freeze execution if USB initialization fails
+  }
+  Serial.println("USB Host Shield initialized.");
 }
 
 void loop() {
+  // handle USB communication continuously
+  Usb.Task();
+
   int decodedNumber = 8;
   if (irrecv.decode()) {
     decodedNumber = translateIR();
@@ -75,6 +87,7 @@ void loop() {
     currentState = 0;
     Serial.println(currentState);
     displayRedLed();
+    changeSnapshot(69, 0);
     delay(200);
   }
   else if (buttonState2 == HIGH || decodedNumber == 1) {
@@ -82,6 +95,7 @@ void loop() {
     currentState = 1;
     Serial.println(currentState);
     displayYellowLed();
+    changeSnapshot(69, 1);
     delay(200);
   }
   else if (buttonState3 == HIGH || decodedNumber == 2) {
@@ -89,6 +103,7 @@ void loop() {
     currentState = 2;
     Serial.println(currentState);
     displayGreenLed();
+    changeSnapshot(69, 4);
     delay(200);
   }
 
@@ -257,9 +272,18 @@ int translateIR() {
   delay(500); // Do not get immediate repeat
 }
 
-/*
-void changeSnapshot(int snapshotNumber) {
-  // Send Control Change (CC#69) on Channel 1 to change snapshots
-  MIDI.sendControlChange(69, snapshotNumber, 1);  // CC#69, value = snapshotNumber, channel = 1
+void changeSnapshot(byte ccNumber, byte value) {
+  // MIDI Control Change message consists of three bytes
+  uint8_t midiMessage[3];
+    
+  // 0xB0 = Control Change message on channel 1
+  midiMessage[0] = 0xB0 | 0x00;  // Control Change on channel 1 (0xB0)
+  midiMessage[1] = ccNumber;     // Control Change number (snapshot number)
+  midiMessage[2] = value;        // Control Change value (snapshot value 0-7)
+
+  // display the data to the serial monitor
+  Serial.print("MIDI CC Sent: ");
+  Serial.print(ccNumber);
+  Serial.print(" Value: ");
+  Serial.println(value);
 }
-*/
