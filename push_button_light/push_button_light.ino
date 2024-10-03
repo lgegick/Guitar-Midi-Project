@@ -4,6 +4,7 @@
 #include <usbh_midi.h>
 #include <usbhub.h>
 #include <SPI.h>
+#include <Usb.h>
 #include "IRremote.h"
 
 int rhythmSnapshot = 3;
@@ -60,10 +61,10 @@ void setup() {
   irrecv.enableIRIn();
   draw8();
 
-  // Setup the USB MIDI communication
+  // Initialize the USB Host Shield
   if (Usb.Init() == -1) {
     Serial.println("USB Host Shield initialization failed.");
-    while (1);  // Freeze execution if USB initialization fails
+    while (1);  // Halt the execution if USB initialization fails
   }
   Serial.println("USB Host Shield initialized.");
 }
@@ -85,45 +86,45 @@ void loop() {
   if (buttonState1 == HIGH || decodedNumber == 0) {
     // set light to 0
     currentState = 0;
-    Serial.println(currentState);
-    displayRedLed();
-    changeSnapshot(69, 0);
     delay(200);
   }
   else if (buttonState2 == HIGH || decodedNumber == 1) {
     // set light to 1
     currentState = 1;
-    Serial.println(currentState);
-    displayYellowLed();
-    changeSnapshot(69, 1);
     delay(200);
   }
   else if (buttonState3 == HIGH || decodedNumber == 2) {
     // set the light to 2
     currentState = 2;
-    Serial.println(currentState);
-    displayGreenLed();
-    changeSnapshot(69, 4);
     delay(200);
   }
 
-  switch(currentState) {
-    case 0:
-      draw0();
-      // changeSnapshot(leadSnapshot);
-      break;
-    case 1:
-      draw1();
-      // changeSnapshot(leadSnapshot2);
-      break;
-    case 2:
-      draw2();
-      // changeSnapshot(rhythmSnapshot);
-      break;
-    default:
-      draw8();
-      break;
+  if (currentState != previousState) {
+    switch(currentState) {
+      case 0:
+        draw0();
+        displayRedLed();
+        changeSnapshot(69, 0);
+        break;
+      case 1:
+        draw1();
+        displayYellowLed();
+        changeSnapshot(69, 1);
+        break;
+      case 2:
+        draw2();
+        displayGreenLed();
+        changeSnapshot(69, 4);
+        break;
+      default:
+        draw8();
+        break;
+    }
+    Serial.println(currentState);
+
   }
+
+  previousState = currentState;
   irrecv.resume();
   delay(50);
 }
@@ -247,29 +248,34 @@ void draw9() {
 }
 
 int translateIR() {
-  // Check if it is a repeat IR code 
-  if (irrecv.decodedIRData.flags)
-  {
-    //set the current decodedRawData to the last decodedRawData 
-    irrecv.decodedIRData.decodedRawData = last_decodedRawData;
-    return last_decodedRawData;
-  } 
-  int decodedData = 8;
+  if (irrecv.decode()) {
+    // Check if it is a repeat IR code 
+    if (irrecv.decodedIRData.flags) {
+      // set the current decodedRawData to the last decodedRawData 
+      irrecv.decodedIRData.decodedRawData = last_decodedRawData;
+    } else {
+      // Store the new raw data
+      last_decodedRawData = irrecv.decodedIRData.decodedRawData;
+    }
 
-  //map the IR code to the remote key
-  switch (irrecv.decodedIRData.decodedRawData)
-  {
-    case 0xE916FF00: decodedData = 0;    break;
-    case 0xF30CFF00: decodedData = 1;    break;
-    case 0xE718FF00: decodedData = 2;    break;
-    default:
-      decodedData = 8;
+    // Map the IR code to the remote key
+    int decodedData = 8;  // Default to 8 for unrecognized codes
+    switch (last_decodedRawData) {
+      case 0xE916FF00: decodedData = 0; break;  // Remote button 0
+      case 0xF30CFF00: decodedData = 1; break;  // Remote button 1
+      case 0xE718FF00: decodedData = 2; break;  // Remote button 2
+      default: decodedData = 8;
+    }
+
+    // Print the decoded value to the serial monitor for debugging
+    Serial.print("IR Decoded Data: ");
+    Serial.println(decodedData);
+
+    // Prepare to receive the next value
+    irrecv.resume();
+    return decodedData;  // Return the decoded data for use in loop()
   }
-
-  //store the last decodedRawData
-  last_decodedRawData = decodedData;
-  return decodedData;
-  delay(500); // Do not get immediate repeat
+  return 8;  // Default value when no IR code is detected
 }
 
 void changeSnapshot(byte ccNumber, byte value) {
