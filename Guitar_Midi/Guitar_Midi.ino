@@ -1,10 +1,7 @@
 // this code handles the push button and reflects the button press on a 7 segment light
 
-#include <hidboot.h>
 #include <usbh_midi.h>
 #include <usbhub.h>
-#include <SPI.h>
-#include <Usb.h>
 #include "IRremote.h"
 
 int rhythmSnapshot = 3;
@@ -25,7 +22,7 @@ int leadSnapshot2 = 2;
 #define button2 11
 #define button3 12
 int currentState = 0;
-int previousState = 0;
+int previousState = -1;
 
 // IR receiver variables
 int receiver = A0;
@@ -64,69 +61,90 @@ void setup() {
   // Initialize the USB Host Shield
   if (Usb.Init() == -1) {
     Serial.println("USB Host Shield initialization failed.");
-    while (1);  // Halt the execution if USB initialization fails
+    delay(1000);
   }
+  Serial.println(Usb.getUsbTaskState());
   Serial.println("USB Host Shield initialized.");
 }
 
 void loop() {
+  Serial.println();
+
   // handle USB communication continuously
   Usb.Task();
+  Serial.println(Usb.getUsbTaskState());
+
 
   int decodedNumber = 8;
+  /*
   if (irrecv.decode()) {
     decodedNumber = translateIR();
-  }
+  } */
+
 
   // read the state of the button
   int buttonState1 = digitalRead(button1);
   int buttonState2 = digitalRead(button2);
   int buttonState3 = digitalRead(button3);
 
-  if (buttonState1 == HIGH || decodedNumber == 0) {
+  Serial.println("buttonState1: " + String(buttonState1) + "\tbuttonState2: " + String(buttonState2) + "\tbuttonState3: " + String(buttonState3));
+
+  if (buttonState1 == LOW || decodedNumber == 0) {
     // set light to 0
     currentState = 0;
+    Serial.println("BUTTON PRESSED");
     delay(200);
   }
-  else if (buttonState2 == HIGH || decodedNumber == 1) {
+  else if (buttonState2 == LOW || decodedNumber == 1) {
     // set light to 1
     currentState = 1;
+    Serial.println("BUTTON PRESSED");
     delay(200);
   }
-  else if (buttonState3 == HIGH || decodedNumber == 2) {
+  else if (buttonState3 == LOW || decodedNumber == 2) {
     // set the light to 2
     currentState = 2;
+    Serial.println("BUTTON PRESSED");
     delay(200);
-  }
+  } 
 
-  if (currentState != previousState) {
+  Serial.println("USB Task State: " + String(static_cast<bool>(Usb.getUsbTaskState())));
+  if (currentState != previousState && Usb.getUsbTaskState() == 144) {
     switch(currentState) {
-      case 0:
+      case 0: {
         draw0();
         displayRedLed();
-        changeSnapshot(69, 0);
+        uint8_t snapshot1[] = {0xB0, 69, 0};
+        Midi.SendData(snapshot1, sizeof(snapshot1));
+        Serial.println("CURRENT SNAPSHOT 0");
         break;
-      case 1:
+      }
+      case 1: {
         draw1();
         displayYellowLed();
-        changeSnapshot(69, 1);
+        uint8_t snapshot2[] = {0xB0, 69, 1};
+        Midi.SendData(snapshot2, sizeof(snapshot2));
+        Serial.println("CURRENT SNAPSHOT 1");
         break;
-      case 2:
+      }
+      case 2: {
         draw2();
         displayGreenLed();
-        changeSnapshot(69, 4);
+        uint8_t snapshot3[] = {0xB0, 69, 4};
+        Midi.SendData(snapshot3, sizeof(snapshot3));
+        Serial.println("CURRENT SNAPSHOT 4");
         break;
-      default:
+      }
+      default: {
         draw8();
         break;
+      }
     }
-    Serial.println(currentState);
 
+    previousState = currentState;
   }
 
-  previousState = currentState;
-  irrecv.resume();
-  delay(50);
+  delay(1000);
 }
 
 void displayRedLed() {
@@ -278,18 +296,3 @@ int translateIR() {
   return 8;  // Default value when no IR code is detected
 }
 
-void changeSnapshot(byte ccNumber, byte value) {
-  // MIDI Control Change message consists of three bytes
-  uint8_t midiMessage[3];
-    
-  // 0xB0 = Control Change message on channel 1
-  midiMessage[0] = 0xB0 | 0x00;  // Control Change on channel 1 (0xB0)
-  midiMessage[1] = ccNumber;     // Control Change number (snapshot number)
-  midiMessage[2] = value;        // Control Change value (snapshot value 0-7)
-
-  // display the data to the serial monitor
-  Serial.print("MIDI CC Sent: ");
-  Serial.print(ccNumber);
-  Serial.print(" Value: ");
-  Serial.println(value);
-}
